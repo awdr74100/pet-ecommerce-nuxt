@@ -24,7 +24,7 @@ export default {
     '@nuxtjs/eslint-module',
   ],
 
-  modules: ['@nuxtjs/axios'],
+  modules: ['@nuxtjs/axios', 'nuxt-helmet'],
 
   build: {
     extractCSS: process.env.NODE_ENV === 'production',
@@ -41,7 +41,7 @@ export default {
 
   serverMiddleware: process.env.BASE_URL
     ? []
-    : [{ path: '/', handler: '@/api/index.js' }],
+    : [{ path: '/', handler: '@/server/index.js' }],
 
   axios: {
     baseURL: process.env.BASE_URL || 'http://localhost:9000',
