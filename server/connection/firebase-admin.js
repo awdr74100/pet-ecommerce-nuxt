@@ -1,6 +1,6 @@
 const admin = require('firebase-admin');
 
-admin.initializeApp({
+const firebaseAdminConfig = {
   credential: admin.credential.cert({
     type: process.env.FIREBASE_ADMIN_TYPE,
     project_id: process.env.FIREBASE_ADMIN_PROJECT_ID,
@@ -16,7 +16,10 @@ admin.initializeApp({
   }),
   databaseURL: process.env.FIREBASE_DATABASEURL,
   storageBucket: process.env.FIREBASE_STORAGEBUCKET,
-});
+};
+
+if (!admin.apps.length) admin.initializeApp(firebaseAdminConfig);
+else admin.app();
 
 module.exports = {
   db: admin.database(),

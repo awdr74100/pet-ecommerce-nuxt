@@ -1,15 +1,20 @@
 const router = require('express').Router();
-// const { auth } = require('../../connection/firebase');
-const { db } = require('../../connection/firebase-admin');
+const {
+  // createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+} = require('../../utils/promiseAuth');
 
-router.post('/signup', async (req, res) => {
+router.post('/signin', async (req, res) => {
   const { email, password } = req.body;
+  console.log(123);
   try {
-    const { key } = await db.ref('/').push({ email, password });
-    console.log(key);
-    res.send({ email, password });
+    const { user } = await signInWithEmailAndPassword(email, password);
+    res.send({ user: user.uid });
   } catch (error) {
     console.log(error);
+    console.log(error.code);
+    console.log(error.message);
+    res.send({ error });
   }
 });
 
