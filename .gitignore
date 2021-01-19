@@ -91,4 +91,5 @@ sw.*
 *.swp
 
 # REST Client
-api/**/index.http
+server/**/index.http
+server/**/index.rest
