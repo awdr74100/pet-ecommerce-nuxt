@@ -20,5 +20,5 @@ app.use(cookieParser());
 // set router
 app.use('/api/admin', require('./router/admin/index'));
 
-// app.listen(9000, () => console.log(`start localhost 9000`));
-module.exports = app;
+app.listen(9000, () => console.log(`start localhost 9000`));
+// module.exports = app;
