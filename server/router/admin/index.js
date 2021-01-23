@@ -4,9 +4,9 @@ const ms = require('ms');
 const { body, cookie, validationResult } = require('express-validator');
 const { db, auth } = require('../../connection/firebase-admin');
 const {
-  generatorAccessToken,
-  generatorRefreshToken,
-} = require('../../utils/generatorToken');
+  generateAccessToken,
+  generateRefreshToken,
+} = require('../../utils/generateToken');
 
 // signup
 router.post(
@@ -29,7 +29,8 @@ router.post(
       const createRequest = { displayName: username, email, password };
       const { uid } = await auth.createUser(createRequest);
       // save user
-      await db.ref(`users/${uid}`).set({ username, email, role: 'admin' });
+      const role = 'admin';
+      await db.ref(`users/${uid}`).set({ username, email, role });
       // end
       return res.send({ success: true, message: '註冊成功' });
     } catch (error) {
@@ -64,14 +65,15 @@ router.post(
         return val[target] === usernameOrEmail && val.role === 'admin';
       });
       if (!user) return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found or role invalid
-      // http request
+      // sign in
       const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
       const payload = { email: user.email, password, returnSecureToken: false };
-      const { localId: uid } = (await axios.post(url, payload)).data;
-      // generator token
+      const { data } = await axios.post(url, payload);
+      // generate token
+      const uid = data.localId;
       const role = 'admin';
-      const accessToken = generatorAccessToken({ uid, role }, ms('15m'));
-      const refreshToken = await generatorRefreshToken({ uid, role }, ms('4h'));
+      const accessToken = generateAccessToken({ uid, role }, ms('15m'));
+      const refreshToken = await generateRefreshToken({ uid, role }, ms('4h'));
       // end
       return res
         .cookie('accessToken', accessToken, {
@@ -79,19 +81,21 @@ router.post(
           maxAge: ms('15m'),
           sameSite: 'strict',
           secure: process.env.BASE_URL || false,
+          path: '/',
         })
         .cookie('refreshToken', refreshToken, {
           httpOnly: true,
           maxAge: ms('4h'),
           sameSite: 'strict',
           secure: process.env.BASE_URL || false,
+          path: '/api/admin',
         })
         .send({
           success: true,
           admin: { email: user.email, username: user.username },
         });
     } catch (error) {
-      if (error.response && error.response.data) {
+      if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
         if (message === 'EMAIL_NOT_FOUND')
           return res.send({ success: false, message: '帳號或密碼錯誤' }); // email not found
@@ -126,8 +130,8 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
     await db.ref('tokens').update(updateTokens);
     // end
     return res
-      .clearCookie('accessToken', { sameSite: 'strict' })
-      .clearCookie('refreshToken', { sameSite: 'strict' })
+      .clearCookie('accessToken', { sameSite: 'strict', path: '/' })
+      .clearCookie('refreshToken', { sameSite: 'strict', path: '/api/admin' })
       .send({ success: true });
   } catch (error) {
     return res.status(500).send({ success: false, message: error.message }); // unknown error
@@ -154,11 +158,11 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
       return { ...arr, [`${key}`]: revoke ? null : { ...tokens[key] } };
     }, {});
     await db.ref('tokens').update(updateTokens);
-    // generator token
-    const role = 'admin';
+    // generate token
     const { uid } = token;
-    const accessToken = generatorAccessToken({ uid, role }, ms('15m'));
-    const refreshToken = await generatorRefreshToken({ uid, role }, ms('4h'));
+    const role = 'admin';
+    const accessToken = generateAccessToken({ uid, role }, ms('15m'));
+    const refreshToken = await generateRefreshToken({ uid, role }, ms('4h'));
     // end
     return res
       .cookie('accessToken', accessToken, {
@@ -166,12 +170,14 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
         maxAge: ms('15m'),
         sameSite: 'strict',
         secure: process.env.BASE_URL || false,
+        path: '/',
       })
       .cookie('refreshToken', refreshToken, {
         httpOnly: true,
         maxAge: ms('4h'),
         sameSite: 'strict',
         secure: process.env.BASE_URL || false,
+        path: '/api/admin',
       })
       .send({ success: true });
   } catch (error) {
