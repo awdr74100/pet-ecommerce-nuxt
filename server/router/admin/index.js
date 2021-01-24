@@ -152,6 +152,7 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
     const token = tokens[hashKey];
     if (!token) return res.status(403).send({ success: false }); // refresh token not found
     if (token.exp < now) return res.status(403).send({ success: false }); // refresh token expired
+    if (token.role !== 'admin') return res.status(403).send({ success: false }); // role invalid
     // revoke and update refresh tokens
     const updateTokens = Object.keys(tokens).reduce((arr, key) => {
       const revoke = tokens[key].exp < now || tokens[key].uid === token.uid;
