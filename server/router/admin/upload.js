@@ -5,8 +5,9 @@ const { bucket } = require('../../connection/firebase-admin');
 const { upload, errorHandle } = require('../../middleware/uploadHandle');
 
 // upload images
-router.post('/', upload.array('images', 10), errorHandle, async (req, res) => {
-  if (!req.files) return res.send({ success: false, message: '禁止欄位為空' });
+router.post('/', upload.array('images', 5), errorHandle, async (req, res) => {
+  const invalid = !req.files || !req.files.length;
+  if (invalid) return res.send({ success: false, message: '禁止欄位為空' });
   const imgUrls = [];
   // generate unique filename
   const generateFilename = () => {
