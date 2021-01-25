@@ -1,0 +1,5 @@
+@BASE_URL = http://localhost:9000
+
+### upload images
+POST {{BASE_URL}}/api/admin/upload HTTP/1.1
+Content-Type: multipart/form-data

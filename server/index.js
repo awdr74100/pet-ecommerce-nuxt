@@ -19,6 +19,7 @@ app.use(cookieParser());
 
 // set router
 app.use('/api/admin', require('./router/admin/index'));
+app.use('/api/admin/upload', require('./router/admin/upload'));
 
 app.listen(9000, () => console.log(`start localhost 9000`));
 // module.exports = app;
