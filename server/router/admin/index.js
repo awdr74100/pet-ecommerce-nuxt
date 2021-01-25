@@ -22,8 +22,7 @@ router.post(
     try {
       // check username
       const users = (await db.ref('/users').once('value')).val() || {};
-      const usernames = Object.values(users).map((val) => val.username);
-      const exist = usernames.includes(username);
+      const exist = Object.values(users).some((vl) => vl.username === username);
       if (exist) return res.send({ success: false, message: '用戶名已存在' }); // username already exist
       // create user
       const createRequest = { displayName: username, email, password };
@@ -61,8 +60,8 @@ router.post(
       // check username and role
       const target = usernameOrEmail.includes('@') ? 'email' : 'username';
       const users = (await db.ref('/users').once('value')).val() || {};
-      const user = Object.values(users).find((val) => {
-        return val[target] === usernameOrEmail && val.role === 'admin';
+      const user = Object.values(users).find((vl) => {
+        return vl[target] === usernameOrEmail && vl.role === 'admin';
       });
       if (!user) return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found or role invalid
       // sign in
