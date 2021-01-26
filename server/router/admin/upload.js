@@ -22,9 +22,8 @@ router.post(
     const imgUrls = [];
     // generate unique filename
     const generateFilename = () => {
-      const hash = crypto.randomBytes(12).toString('hex');
-      const now = Date.now();
-      return `products/pet-${now}-${hash}`;
+      const hash = crypto.randomBytes(20).toString('hex');
+      return `products/pet-${hash}`;
     };
     // generate unique options
     const generateOptions = (mimetype) => {
