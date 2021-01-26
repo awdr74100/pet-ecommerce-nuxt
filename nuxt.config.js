@@ -31,6 +31,11 @@ export default {
     hotMiddleware: {
       client: { noInfo: true },
     },
+    postcss: {
+      plugins: {
+        'postcss-nested': {}, // replace postcss-preset-env (use postcss-nesting)
+      },
+    },
   },
 
   loading: false,
