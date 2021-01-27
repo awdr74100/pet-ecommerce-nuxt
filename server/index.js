@@ -1,9 +1,8 @@
+require('dotenv').config();
 const app = require('express')();
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
-// eslint-disable-next-line import/no-extraneous-dependencies
-require('dotenv').config();
 
 const corsOptions = {
   origin: process.env.BASE_URL || true,

@@ -80,14 +80,14 @@ router.post(
           httpOnly: true,
           maxAge: ms('15m'),
           sameSite: 'strict',
-          secure: process.env.BASE_URL || false,
+          secure: !!process.env.ON_VERCEL,
           path: '/',
         })
         .cookie('refreshToken', refreshToken, {
           httpOnly: true,
           maxAge: ms('4h'),
           sameSite: 'strict',
-          secure: process.env.BASE_URL || false,
+          secure: !!process.env.ON_VERCEL,
           path: '/api/user',
         })
         .send({
@@ -172,14 +172,14 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
         httpOnly: true,
         maxAge: ms('15m'),
         sameSite: 'strict',
-        secure: process.env.BASE_URL || false,
+        secure: !!process.env.ON_VERCEL,
         path: '/',
       })
       .cookie('refreshToken', refreshToken, {
         httpOnly: true,
         maxAge: ms('4h'),
         sameSite: 'strict',
-        secure: process.env.BASE_URL || false,
+        secure: !!process.env.ON_VERCEL,
         path: '/api/user',
       })
       .send({ success: true });

@@ -1,5 +1,8 @@
 {
   "version": 2,
+  "env": {
+    "ON_VERCEL": "true"
+  },
   "builds": [
     {
       "src": "/server/index.js",

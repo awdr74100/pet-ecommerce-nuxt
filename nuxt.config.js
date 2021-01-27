@@ -44,7 +44,7 @@ export default {
     port: 9000,
   },
 
-  serverMiddleware: process.env.BASE_URL
+  serverMiddleware: process.env.ON_VERCEL
     ? []
     : [{ path: '/', handler: '@/server/index.js' }],
 
