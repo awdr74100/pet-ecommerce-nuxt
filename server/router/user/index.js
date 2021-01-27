@@ -88,7 +88,7 @@ router.post(
           maxAge: ms('4h'),
           sameSite: 'strict',
           secure: process.env.BASE_URL || false,
-          path: '/api/users',
+          path: '/api/user',
         })
         .send({
           success: true,
@@ -133,7 +133,7 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
     // end
     return res
       .clearCookie('accessToken', { sameSite: 'strict', path: '/' })
-      .clearCookie('refreshToken', { sameSite: 'strict', path: '/api/users' })
+      .clearCookie('refreshToken', { sameSite: 'strict', path: '/api/user' })
       .send({ success: true, message: '已登出' });
   } catch (error) {
     return res.status(500).send({ success: false, message: error.message }); // unknown error
@@ -180,7 +180,7 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
         maxAge: ms('4h'),
         sameSite: 'strict',
         secure: process.env.BASE_URL || false,
-        path: '/api/users',
+        path: '/api/user',
       })
       .send({ success: true });
   } catch (error) {
