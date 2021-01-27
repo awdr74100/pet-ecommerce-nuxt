@@ -123,7 +123,7 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
     if (!token && token.role !== 'admin') {
       return res.send({ success: true, message: '已登出' }); // avoid revoke token
     }
-    // revoke and update refresh tokens
+    // revoke refresh tokens
     const updateTokens = Object.keys(tokens).reduce((arr, key) => {
       const revoke = tokens[key].exp < now || tokens[key].uid === token.uid;
       return { ...arr, [`${key}`]: revoke ? null : { ...tokens[key] } };
@@ -154,7 +154,7 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
     if (!token) return res.status(403).send({ success: false }); // refresh token not found
     if (token.exp < now) return res.status(403).send({ success: false }); // refresh token expired
     if (token.role !== 'admin') return res.status(403).send({ success: false }); // role invalid
-    // revoke and update refresh tokens
+    // revoke refresh tokens
     const updateTokens = Object.keys(tokens).reduce((arr, key) => {
       const revoke = tokens[key].exp < now || tokens[key].uid === token.uid;
       return { ...arr, [`${key}`]: revoke ? null : { ...tokens[key] } };
