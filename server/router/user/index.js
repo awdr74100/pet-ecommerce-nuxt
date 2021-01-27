@@ -11,9 +11,9 @@ const {
 // signup
 router.post(
   '/signup',
-  body('username').isAlphanumeric().isLength({ max: 12 }),
+  body('username').isAlphanumeric().isLength({ min: 4, max: 14 }),
   body('email').isEmail(),
-  body('password').isLength({ min: 6, max: 12 }),
+  body('password').isLength({ min: 6, max: 14 }),
   async (req, res) => {
     // check body
     const errs = validationResult(req);
