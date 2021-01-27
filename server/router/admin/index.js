@@ -112,7 +112,7 @@ router.post(
 router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
   // check cookie
   const errs = validationResult(req);
-  if (!errs.isEmpty()) return res.send({ success: true, message: '已登出' }); // pass
+  if (!errs.isEmpty()) return res.send({ success: true, message: '已登出' }); // avoid revoke token
   const { refreshToken: hashKey } = req.cookies;
   try {
     // current timestamp
@@ -120,7 +120,9 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
     // check refresh token
     const tokens = (await db.ref('/tokens').once('value')).val() || {};
     const token = tokens[hashKey];
-    if (!token) return res.send({ success: true, message: '已登出' }); // pass
+    if (!token && token.role !== 'admin') {
+      return res.send({ success: true, message: '已登出' }); // avoid revoke token
+    }
     // revoke and update refresh tokens
     const updateTokens = Object.keys(tokens).reduce((arr, key) => {
       const revoke = tokens[key].exp < now || tokens[key].uid === token.uid;
@@ -131,7 +133,7 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
     return res
       .clearCookie('accessToken', { sameSite: 'strict', path: '/' })
       .clearCookie('refreshToken', { sameSite: 'strict', path: '/api/admin' })
-      .send({ success: true });
+      .send({ success: true, message: '已登出' });
   } catch (error) {
     return res.status(500).send({ success: false, message: error.message }); // unknown error
   }
