@@ -120,7 +120,7 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
     // check refresh token
     const tokens = (await db.ref('/tokens').once('value')).val() || {};
     const token = tokens[hashKey];
-    if (!token && token.role !== 'admin') {
+    if (!token || token.role !== 'admin') {
       return res.send({ success: true, message: '已登出' }); // avoid revoke token
     }
     // revoke refresh tokens
