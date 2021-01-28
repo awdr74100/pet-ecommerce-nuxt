@@ -206,9 +206,8 @@ router.post('/send_pwd_reset', body('email').isEmail(), async (req, res) => {
   } catch (error) {
     if (error.response && error.response.data && error.response.data.error) {
       const { message } = error.response.data.error;
-      if (message === 'EMAIL_NOT_FOUND') {
+      if (message === 'EMAIL_NOT_FOUND')
         return res.send({ success: false, message: '帳號不存在' }); // email not found
-      }
       return res.send({ success: false, message }); // other error
     }
     return res.status(500).send({ success: false, message: error.message }); // unknown error
