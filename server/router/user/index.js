@@ -103,6 +103,7 @@ router.post(
           return res.send({ success: false, message: '帳號或密碼錯誤' }); // invalid password
         if (message.includes('TOO_MANY_ATTEMPTS_TRY_LATER'))
           return res.send({ success: false, message: '稍後再嘗試登入' }); // too many attempts try later
+        return res.send({ success: false, message }); // other error
       }
       return res.status(500).send({ success: false, message: error.message }); // unknown error
     }
@@ -140,8 +141,8 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
   }
 });
 
-// refresh
-router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
+// refresh token
+router.post('/token', cookie('refreshToken').notEmpty(), async (req, res) => {
   // check cookie
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(401).send({ success: false }); // invalid value
@@ -184,6 +185,32 @@ router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
       })
       .send({ success: true });
   } catch (error) {
+    return res.status(500).send({ success: false, message: error.message }); // unknown error
+  }
+});
+
+// send password reset mail
+router.post('/send_pwd_reset', body('email').isEmail(), async (req, res) => {
+  // check body
+  const errs = validationResult(req);
+  if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
+  const { email } = req.body;
+  try {
+    // send reset password mail
+    const url = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
+    const headers = { 'X-Firebase-Locale': 'zh_tw' };
+    const payload = { requestType: 'PASSWORD_RESET', email };
+    await axios.post(url, payload, { headers });
+    // end
+    return res.send({ success: true, message: '已發送密碼重置郵件' });
+  } catch (error) {
+    if (error.response && error.response.data && error.response.data.error) {
+      const { message } = error.response.data.error;
+      if (message === 'EMAIL_NOT_FOUND') {
+        return res.send({ success: false, message: '帳號不存在' }); // email not found
+      }
+      return res.send({ success: false, message }); // other error
+    }
     return res.status(500).send({ success: false, message: error.message }); // unknown error
   }
 });

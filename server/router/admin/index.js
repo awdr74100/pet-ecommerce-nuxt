@@ -102,6 +102,7 @@ router.post(
           return res.send({ success: false, message: '帳號或密碼錯誤' }); // invalid password
         if (message.includes('TOO_MANY_ATTEMPTS_TRY_LATER'))
           return res.send({ success: false, message: '稍後再嘗試登入' }); // too many attempts try later
+        return res.send({ success: false, message }); // other error
       }
       return res.status(500).send({ success: false, message: error.message }); // unknown error
     }
@@ -139,8 +140,8 @@ router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
   }
 });
 
-// refresh
-router.post('/refresh', cookie('refreshToken').notEmpty(), async (req, res) => {
+// refresh token
+router.post('/token', cookie('refreshToken').notEmpty(), async (req, res) => {
   // check cookie
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(401).send({ success: false }); // invalid value
