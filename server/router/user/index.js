@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const axios = require('axios').default;
 const ms = require('ms');
+const { verify } = require('jsonwebtoken');
 const { body, cookie, validationResult } = require('express-validator');
 const { db, auth } = require('../../connection/firebase-admin');
 const {
@@ -11,7 +12,7 @@ const {
 // signup
 router.post(
   '/signup',
-  body('username').isAlphanumeric().isLength({ min: 4, max: 14 }),
+  body('username').isAlphanumeric().isLength({ min: 6, max: 14 }),
   body('email').isEmail(),
   body('password').isLength({ min: 6, max: 14 }),
   async (req, res) => {
@@ -23,17 +24,19 @@ router.post(
       // check username
       const users = (await db.ref('/users').once('value')).val() || {};
       const exist = Object.values(users).some((vl) => vl.username === username);
-      if (exist) return res.send({ success: false, message: '用戶名已存在' }); // username already exist
+      if (exist) throw new Error('custom/username-already-exist');
       // create user
       const createRequest = { displayName: username, email, password };
       const { uid } = await auth.createUser(createRequest);
       // save user
-      const role = 'user';
-      const draws = 3; // number of draws
-      await db.ref(`users/${uid}`).set({ username, email, role, draws });
+      const payload = { username, email, role: 'user', tokenVersion: 0 };
+      payload.draws = 3; // number of draws (only users)
+      await db.ref(`users/${uid}`).set(payload);
       // end
       return res.send({ success: true, message: '註冊成功' });
     } catch (error) {
+      if (error.message === 'custom/username-already-exist')
+        return res.send({ success: false, message: '用戶名已存在' }); // username already exist
       if (error.code === 'auth/email-already-exists')
         return res.send({ success: false, message: '信箱已被使用' }); // email-already-exists
       if (error.code === 'auth/invalid-email')
@@ -58,22 +61,23 @@ router.post(
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
     const { usernameOrEmail, password } = req.body;
     try {
-      // check username and role
+      // check username
       const target = usernameOrEmail.includes('@') ? 'email' : 'username';
       const users = (await db.ref('/users').once('value')).val() || {};
       const user = Object.values(users).find((vl) => {
-        return vl[target] === usernameOrEmail && vl.role === 'user';
+        return vl[target] === usernameOrEmail;
       });
-      if (!user) return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found or role invalid
+      if (!user) throw new Error('custom/username-not-found');
+      // check role
+      if (user.role !== 'user') throw new Error('custom/role-invalid');
       // sign in
       const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
       const payload = { email: user.email, password, returnSecureToken: false };
       const { data } = await axios.post(url, payload);
       // generate token
       const uid = data.localId;
-      const role = 'user';
-      const accessToken = generateAccessToken({ uid, role }, ms('15m'));
-      const refreshToken = await generateRefreshToken({ uid, role }, ms('4h'));
+      const accessToken = generateAccessToken({ uid, ...user }, '15m');
+      const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
       return res
         .cookie('accessToken', accessToken, {
@@ -88,13 +92,17 @@ router.post(
           maxAge: ms('4h'),
           sameSite: 'strict',
           secure: !!process.env.ON_VERCEL,
-          path: '/api/user',
+          path: '/api/user/refresh_token',
         })
         .send({
           success: true,
           user: { email: user.email, username: user.username },
         });
     } catch (error) {
+      if (error.message === 'custom/username-not-found')
+        return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found
+      if (error.message === 'custom/role-invalid')
+        return res.send({ success: false, message: '帳號或密碼錯誤' }); // role invalid
       if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
         if (message === 'EMAIL_NOT_FOUND')
@@ -111,86 +119,111 @@ router.post(
 );
 
 // signout
-router.post('/signout', cookie('refreshToken').notEmpty(), async (req, res) => {
+router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
+  const sendClearTokens = (_res) => {
+    _res
+      .clearCookie('accessToken', {
+        sameSite: 'strict',
+        path: '/',
+      })
+      .clearCookie('refreshToken', {
+        sameSite: 'strict',
+        path: '/api/user/refresh_token',
+      })
+      .send({ success: true });
+  };
   // check cookie
   const errs = validationResult(req);
-  if (!errs.isEmpty()) return res.send({ success: true, message: '已登出' }); // avoid revoke token
-  const { refreshToken: hashKey } = req.cookies;
+  if (!errs.isEmpty()) return sendClearTokens(res);
+  const { accessToken: credential } = req.cookies;
   try {
-    // current timestamp
-    const now = Date.now();
-    // check refresh token
-    const tokens = (await db.ref('/tokens').once('value')).val() || {};
-    const token = tokens[hashKey];
-    if (!token || token.role !== 'user') {
-      return res.send({ success: true, message: '已登出' }); // avoid revoke token
-    }
-    // revoke refresh tokens
-    const updateTokens = Object.keys(tokens).reduce((arr, key) => {
-      const revoke = tokens[key].exp < now || tokens[key].uid === token.uid;
-      return { ...arr, [`${key}`]: revoke ? null : { ...tokens[key] } };
-    }, {});
-    await db.ref('tokens').update(updateTokens);
+    // verify access token
+    const secret = process.env.ACCESS_TOKEN_SECRET;
+    const { uid, role } = await verify(credential, secret);
+    // check rule
+    if (role !== 'user') throw new Error('');
+    // get refresh token version
+    const user = (await db.ref(`/users/${uid}`).once('value')).val();
+    if (!user) return sendClearTokens(res);
+    // update refresh token version
+    const { tokenVersion } = user;
+    await db.ref(`/users/${uid}`).update({ tokenVersion: tokenVersion + 1 });
     // end
-    return res
-      .clearCookie('accessToken', { sameSite: 'strict', path: '/' })
-      .clearCookie('refreshToken', { sameSite: 'strict', path: '/api/user' })
-      .send({ success: true, message: '已登出' });
+    return sendClearTokens(res);
   } catch (error) {
-    return res.status(500).send({ success: false, message: error.message }); // unknown error
+    return sendClearTokens(res);
   }
 });
 
 // refresh token
-router.post('/token', cookie('refreshToken').notEmpty(), async (req, res) => {
-  // check cookie
-  const errs = validationResult(req);
-  if (!errs.isEmpty()) return res.status(401).send({ success: false }); // invalid value
-  const { refreshToken: hashKey } = req.cookies;
-  try {
-    // current timestamp
-    const now = Date.now();
-    // check refresh token
-    const tokens = (await db.ref('/tokens').once('value')).val() || {};
-    const token = tokens[hashKey];
-    if (!token) return res.status(403).send({ success: false }); // refresh token not found
-    if (token.exp < now) return res.status(403).send({ success: false }); // refresh token expired
-    if (token.role !== 'user') return res.status(403).send({ success: false }); // role invalid
-    // revoke refresh tokens
-    const updateTokens = Object.keys(tokens).reduce((arr, key) => {
-      const revoke = tokens[key].exp < now || tokens[key].uid === token.uid;
-      return { ...arr, [`${key}`]: revoke ? null : { ...tokens[key] } };
-    }, {});
-    await db.ref('tokens').update(updateTokens);
-    // generate token
-    const { uid } = token;
-    const role = 'user';
-    const accessToken = generateAccessToken({ uid, role }, ms('15m'));
-    const refreshToken = await generateRefreshToken({ uid, role }, ms('4h'));
-    // end
-    return res
-      .cookie('accessToken', accessToken, {
-        httpOnly: true,
-        maxAge: ms('15m'),
-        sameSite: 'strict',
-        secure: !!process.env.ON_VERCEL,
-        path: '/',
-      })
-      .cookie('refreshToken', refreshToken, {
-        httpOnly: true,
-        maxAge: ms('4h'),
-        sameSite: 'strict',
-        secure: !!process.env.ON_VERCEL,
-        path: '/api/user',
-      })
-      .send({ success: true });
-  } catch (error) {
-    return res.status(500).send({ success: false, message: error.message }); // unknown error
-  }
-});
+router.post(
+  '/refresh_token',
+  cookie('refreshToken').isJWT(),
+  async (req, res) => {
+    // check cookie
+    const errs = validationResult(req);
+    if (!errs.isEmpty()) return res.status(401).send({ success: false }); // invalid value
+    const { refreshToken: credential } = req.cookies;
+    try {
+      // verify refresh token
+      const secret = process.env.REFRESH_TOKEN_SECRET;
+      const { uid, role, tokenVersion } = await verify(credential, secret);
+      // check rule
+      if (role !== 'user') throw new Error('custom/role-invalid');
+      // check user
+      const user = (await db.ref(`/users/${uid}`).once('value')).val();
+      if (!user) throw new Error('custom/account-has-been-revoked');
+      // check refresh token version
+      if (user.tokenVersion !== tokenVersion) {
+        throw new Error('custom/token-has-been-revoked');
+      }
+      // update refresh token version
+      user.tokenVersion += 1;
+      await db.ref(`/users/${uid}`).update(user);
+      // generate token
+      const accessToken = generateAccessToken({ uid, ...user }, '15m');
+      const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
+      // end
+      return res
+        .cookie('accessToken', accessToken, {
+          httpOnly: true,
+          maxAge: ms('15m'),
+          sameSite: 'strict',
+          secure: !!process.env.ON_VERCEL,
+          path: '/',
+        })
+        .cookie('refreshToken', refreshToken, {
+          httpOnly: true,
+          maxAge: ms('4h'),
+          sameSite: 'strict',
+          secure: !!process.env.ON_VERCEL,
+          path: '/api/user/refresh_token',
+        })
+        .send({
+          success: true,
+          user: { email: user.email, username: user.username },
+        });
+    } catch (error) {
+      if (error.message === 'custom/role-invalid')
+        return res.status(403).send({ success: false, message: '權限不足' }); // role invalid
+      if (error.message === 'custom/account-has-been-revoked')
+        return res.status(403).send({ success: false, message: '帳號已註銷' }); // account has been revoked
+      if (error.message === 'custom/token-has-been-revoked')
+        return res.status(403).send({ success: false, message: '令牌已註銷' }); // token has been revoked
+      if (error.message === 'custom/jwt-must-be-provided')
+        return res.status(401).send({ success: false, message: '未攜帶令牌' }); // jwt must be provided
+      if (error.message === 'invalid token')
+        return res.status(401).send({ success: false, message: '無效令牌' }); // invalid token
+      if (error.message === 'jwt expired')
+        return res.status(403).send({ success: false, message: '令牌已過期' }); // jwt expired
+      if (error.message === 'invalid signature')
+        return res.status(403).send({ success: false, message: '無效簽名' }); // invalid signature
+      return res.status(500).send({ success: false, message: error.message }); // unknown error
+    }
+  },
+);
 
-// send password reset mail
-router.post('/send_pwd_reset', body('email').isEmail(), async (req, res) => {
+router.post('/send_password', body('email').isEmail(), async (req, res) => {
   // check body
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
