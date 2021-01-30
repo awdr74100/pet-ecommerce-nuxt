@@ -44,9 +44,7 @@ export default {
     port: 9000,
   },
 
-  serverMiddleware: process.env.ON_VERCEL
-    ? []
-    : [{ path: '/', handler: '@/server/index.js' }],
+  serverMiddleware: [{ path: '/api', handler: '@/server/index.js' }],
 
   axios: {
     baseURL: process.env.BASE_URL || 'http://localhost:9000',

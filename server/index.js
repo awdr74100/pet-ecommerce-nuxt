@@ -1,4 +1,3 @@
-require('dotenv').config();
 const app = require('express')();
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -17,9 +16,8 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 // set router
-app.use('/api/admin', require('./router/admin/index'));
-app.use('/api/admin/upload', require('./router/admin/upload'));
-app.use('/api/user', require('./router/user/index'));
+app.use('/admin', require('./router/admin/index'));
+app.use('/admin/upload', require('./router/admin/upload'));
+app.use('/user', require('./router/user/index'));
 
-app.listen(9000, () => console.log(`start localhost 9000`));
-// module.exports = app;
+module.exports = app;
