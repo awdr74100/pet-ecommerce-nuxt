@@ -1,7 +1,13 @@
-const app = require('express')();
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const cookieParser = require('cookie-parser');
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import cookieParser from 'cookie-parser';
+
+import adminRouter from './router/admin/index';
+import adminUploadRouter from './router/admin/upload';
+import userRouter from './router/user/index';
+
+const app = express();
 
 const corsOptions = {
   origin: process.env.BASE_URL || true,
@@ -15,9 +21,8 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// set router
-app.use('/admin', require('./router/admin/index'));
-app.use('/admin/upload', require('./router/admin/upload'));
-app.use('/user', require('./router/user/index'));
+app.use('/admin', adminRouter);
+app.use('/admin/upload', adminUploadRouter);
+app.use('/user', userRouter);
 
-module.exports = app;
+export default app;

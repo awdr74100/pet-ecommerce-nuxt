@@ -1,4 +1,4 @@
-const admin = require('firebase-admin');
+import admin from 'firebase-admin';
 
 const firebaseAdminConfig = {
   credential: admin.credential.cert({
@@ -21,8 +21,6 @@ const firebaseAdminConfig = {
 if (!admin.apps.length) admin.initializeApp(firebaseAdminConfig);
 else admin.app();
 
-module.exports = {
-  auth: admin.auth(),
-  db: admin.database(),
-  bucket: admin.storage().bucket(),
-};
+export const auth = admin.auth();
+export const db = admin.database();
+export const bucket = admin.storage().bucket();

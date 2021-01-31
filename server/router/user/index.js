@@ -1,13 +1,15 @@
-const router = require('express').Router();
-const axios = require('axios').default;
-const ms = require('ms');
-const { verify } = require('jsonwebtoken');
-const { body, cookie, validationResult } = require('express-validator');
-const { db, auth } = require('../../connection/firebase-admin');
-const {
+import express from 'express';
+import axios from 'axios';
+import ms from 'ms';
+import { verify } from 'jsonwebtoken';
+import { body, cookie, validationResult } from 'express-validator';
+import { db, auth } from '../../connection/firebase-admin';
+import {
   generateAccessToken,
   generateRefreshToken,
-} = require('../../utils/generateToken');
+} from '../../utils/generateToken';
+
+const router = express.Router();
 
 // signup
 router.post(
@@ -247,4 +249,4 @@ router.post('/send_password', body('email').isEmail(), async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

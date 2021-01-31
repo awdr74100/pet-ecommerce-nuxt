@@ -1,7 +1,7 @@
-const multer = require('multer');
-const convert = require('heic-convert');
+import multer from 'multer';
+import convert from 'heic-convert';
 
-const upload = multer({
+export const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter(req, file, cb) {
     const regex = /\.(jpe?g|gif|png|bmp|webp|heic)$/i;
@@ -11,7 +11,7 @@ const upload = multer({
   limits: { fileSize: 1024 * 1024 }, // 1MB (byte)
 });
 
-const convertHEIC = async (req, res, next) => {
+export const convertHEIC = async (req, res, next) => {
   const heicIndexArray = req.files.reduce((arr, file, index) => {
     const regex = /\.(heic)$/i;
     return regex.test(file.originalname) ? [...arr, index] : arr;
@@ -37,7 +37,7 @@ const convertHEIC = async (req, res, next) => {
 };
 
 // eslint-disable-next-line no-unused-vars
-const errorHandle = (err, req, res, next) => {
+export const errorHandle = (err, req, res, next) => {
   if (err.message === 'Invalid image type')
     return res.send({ success: false, message: '不支援的檔案格式' });
   if (err.message === 'File too large')
@@ -48,5 +48,3 @@ const errorHandle = (err, req, res, next) => {
     return res.send({ success: false, message: '欄位名稱不正確' });
   return res.send({ success: false, message: err.message });
 };
-
-module.exports = { upload, convertHEIC, errorHandle };

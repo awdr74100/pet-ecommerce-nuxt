@@ -1,12 +1,14 @@
-const router = require('express').Router();
-const crypto = require('crypto');
-const { v4: uuidv4 } = require('uuid');
-const { bucket } = require('../../connection/firebase-admin');
-const {
+import express from 'express';
+import { randomBytes } from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
+import { bucket } from '../../connection/firebase-admin';
+import {
   upload,
   convertHEIC,
   errorHandle,
-} = require('../../middleware/uploadHandle');
+} from '../../middleware/uploadHandle';
+
+const router = express.Router();
 
 // upload images
 router.post(
@@ -22,7 +24,7 @@ router.post(
     const imgUrls = [];
     // generate unique filename
     const generateFilename = () => {
-      const hash = crypto.randomBytes(20).toString('hex');
+      const hash = randomBytes(20).toString('hex');
       return `products/pet-${hash}`;
     };
     // generate unique options
@@ -59,4 +61,4 @@ router.post(
   },
 );
 
-module.exports = router;
+export default router;

@@ -1,6 +1,6 @@
-const { sign } = require('jsonwebtoken');
+import { sign } from 'jsonwebtoken';
 
-const generateAccessToken = (payload, expiresIn) => {
+export const generateAccessToken = (payload, expiresIn) => {
   return sign(
     {
       uid: payload.uid,
@@ -11,7 +11,7 @@ const generateAccessToken = (payload, expiresIn) => {
   );
 };
 
-const generateRefreshToken = (payload, expiresIn) => {
+export const generateRefreshToken = (payload, expiresIn) => {
   return sign(
     {
       uid: payload.uid,
@@ -22,5 +22,3 @@ const generateRefreshToken = (payload, expiresIn) => {
     { expiresIn },
   );
 };
-
-module.exports = { generateAccessToken, generateRefreshToken };
