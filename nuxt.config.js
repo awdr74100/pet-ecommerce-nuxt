@@ -54,6 +54,10 @@ export default {
     cssPath: '@/assets/css/all.css',
   },
 
+  helmet: {
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  },
+
   eslint: {
     cache: false,
   },

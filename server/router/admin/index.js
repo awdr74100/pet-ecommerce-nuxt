@@ -31,7 +31,13 @@ router.post(
       const createRequest = { displayName: username, email, password };
       const { uid } = await auth.createUser(createRequest);
       // save user
-      const payload = { username, email, role: 'admin', tokenVersion: 0 };
+      const payload = {
+        username,
+        email,
+        role: 'admin',
+        tokenVersion: 0,
+        provider: 'custom',
+      };
       await db.ref(`users/${uid}`).set(payload);
       // end
       return res.send({ success: true, message: '註冊成功' });
@@ -70,7 +76,9 @@ router.post(
       });
       if (!user) throw new Error('custom/username-not-found');
       // check role
-      if (user.role !== 'admin') throw new Error('custom/role-invalid');
+      if (user.role !== 'admin') throw new Error('custom/invalid-role');
+      // check provider
+      if (user.provider !== 'custom') throw new Error('custom/oauth-provider');
       // sign in
       const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
       const payload = { email: user.email, password, returnSecureToken: false };
@@ -102,8 +110,10 @@ router.post(
     } catch (error) {
       if (error.message === 'custom/username-not-found')
         return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found
-      if (error.message === 'custom/role-invalid')
-        return res.send({ success: false, message: '帳號或密碼錯誤' }); // role invalid
+      if (error.message === 'custom/invalid-role')
+        return res.send({ success: false, message: '帳號或密碼錯誤' }); // invalid role
+      if (error.message === 'custom/oauth-provider')
+        return res.send({ success: false, message: '帳號或密碼錯誤' }); // oauth provider
       if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
         if (message === 'EMAIL_NOT_FOUND')
@@ -141,7 +151,7 @@ router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
     // verify access token
     const secret = process.env.ACCESS_TOKEN_SECRET;
     const { uid, role } = await verify(credential, secret);
-    // check rule
+    // check role
     if (role !== 'admin') throw new Error('');
     // get refresh token version
     const user = (await db.ref(`/users/${uid}`).once('value')).val();
@@ -169,8 +179,8 @@ router.post(
       // verify refresh token
       const secret = process.env.REFRESH_TOKEN_SECRET;
       const { uid, role, tokenVersion } = await verify(credential, secret);
-      // check rule
-      if (role !== 'admin') throw new Error('custom/role-invalid');
+      // check role
+      if (role !== 'admin') throw new Error('custom/invalid-role');
       // check user
       const user = (await db.ref(`/users/${uid}`).once('value')).val();
       if (!user) throw new Error('custom/account-has-been-revoked');
@@ -205,8 +215,8 @@ router.post(
           admin: { email: user.email, username: user.username },
         });
     } catch (error) {
-      if (error.message === 'custom/role-invalid')
-        return res.status(403).send({ success: false, message: '權限不足' }); // role invalid
+      if (error.message === 'custom/invalid-role')
+        return res.status(403).send({ success: false, message: '權限不足' }); // invalid role
       if (error.message === 'custom/account-has-been-revoked')
         return res.status(403).send({ success: false, message: '帳號已註銷' }); // account has been revoked
       if (error.message === 'custom/token-has-been-revoked')
