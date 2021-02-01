@@ -3,10 +3,10 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import cookieParser from 'cookie-parser';
 
-import adminRouter from './router/admin/index';
-import adminUploadRouter from './router/admin/upload';
-import userRouter from './router/user/index';
-import oauthRouter from './router/oauth/index';
+import adminRouter from './routes/admin/index';
+import adminUploadRouter from './routes/admin/upload';
+import userRouter from './routes/user/index';
+import oauthRouter from './routes/oauth/index';
 
 const app = express();
 
