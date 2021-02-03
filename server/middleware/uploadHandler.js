@@ -37,7 +37,7 @@ export const convertHEIC = async (req, res, next) => {
 };
 
 // eslint-disable-next-line no-unused-vars
-export const errorHandle = (err, req, res, next) => {
+export const errorHandler = (err, req, res, next) => {
   if (err.message === 'Invalid image type')
     return res.send({ success: false, message: '不支援的檔案格式' });
   if (err.message === 'File too large')

@@ -5,8 +5,8 @@ import { bucket } from '../../connection/firebase-admin';
 import {
   upload,
   convertHEIC,
-  errorHandle,
-} from '../../middleware/uploadHandle';
+  errorHandler,
+} from '../../middleware/uploadHandler';
 
 const router = express.Router();
 
@@ -15,7 +15,7 @@ router.post(
   '/',
   upload.array('images', 5),
   convertHEIC,
-  errorHandle,
+  errorHandler,
   async (req, res) => {
     // check empty files
     const errs = !req.files || !req.files.length;
