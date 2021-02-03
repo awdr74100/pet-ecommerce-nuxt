@@ -4,6 +4,7 @@ import ms from 'ms';
 import { verify } from 'jsonwebtoken';
 import { body, cookie, validationResult } from 'express-validator';
 import { db, auth } from '../../connection/firebase-admin';
+import generatePhotoUrl from '../../utils/generatePhotoUrl';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -11,7 +12,7 @@ import {
 
 const router = express.Router();
 
-// signup
+/* signup */
 router.post(
   '/signup',
   body('username').isAlphanumeric().isLength({ min: 6, max: 14 }),
@@ -24,22 +25,36 @@ router.post(
     const { username, email, password } = req.body;
     try {
       // check username
-      const users = (await db.ref('/users').once('value')).val() || {};
-      const exist = Object.values(users).some((vl) => vl.username === username);
+      const exist = (
+        await db.ref(`/users/usernames/${username}`).once('value')
+      ).exists();
       if (exist) throw new Error('custom/username-already-exist');
+      // generate photo url
+      const photoUrl = generatePhotoUrl(96, 96, username, 48, 'fff', '282828');
       // create user
-      const createRequest = { displayName: username, email, password };
-      const { uid } = await auth.createUser(createRequest);
-      // save user
-      const payload = {
-        username,
+      const userInfo = {
+        displayName: username,
         email,
-        role: 'user',
-        draws: 3, // number of draws (only users)
-        tokenVersion: 0,
-        provider: 'custom',
+        password,
+        emailVerified: true, // avoid google oauth replace account
+        photoURL: photoUrl,
       };
-      await db.ref(`users/${uid}`).set(payload);
+      const { uid } = await auth.createUser(userInfo);
+      // save user
+      const userData = {
+        [`usernames/${username}`]: email,
+        [`details/${uid}`]: {
+          username,
+          displayName: username,
+          email,
+          draws: 3, // number of draws (only user)
+          role: 'user',
+          tokenVersion: 0,
+          providers: ['password'],
+          photoUrl,
+        },
+      };
+      await db.ref(`/users`).update(userData);
       // end
       return res.send({ success: true, message: '註冊成功' });
     } catch (error) {
@@ -58,7 +73,7 @@ router.post(
   },
 );
 
-// signin
+/* signin */
 router.post(
   '/signin',
   body('usernameOrEmail').notEmpty(),
@@ -69,23 +84,24 @@ router.post(
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
     const { usernameOrEmail, password } = req.body;
     try {
-      // check username
-      const target = usernameOrEmail.includes('@') ? 'email' : 'username';
-      const users = (await db.ref('/users').once('value')).val() || {};
-      const user = Object.values(users).find((vl) => {
-        return vl[target] === usernameOrEmail;
-      });
-      if (!user) throw new Error('custom/username-not-found');
-      // check role
-      if (user.role !== 'user') throw new Error('custom/invalid-role');
-      // check provider
-      if (user.provider !== 'custom') throw new Error('custom/oauth-provider');
+      // set email
+      let email = usernameOrEmail;
+      if (!usernameOrEmail.includes('@')) {
+        email = (
+          await db.ref(`/users/usernames/${usernameOrEmail}`).once('value')
+        ).val();
+        if (!email) throw new Error('custom/username-not-found');
+      }
       // sign in
       const url = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
-      const payload = { email: user.email, password, returnSecureToken: false };
+      const payload = { email, password, returnSecureToken: false };
       const { data } = await axios.post(url, payload);
-      // generate token
+      // get user
       const uid = data.localId;
+      const user = (await db.ref(`/users/details/${uid}`).once('value')).val();
+      // check role
+      if (user.role !== 'user') throw new Error('custom/invalid-role');
+      // generate token
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
@@ -102,19 +118,23 @@ router.post(
           maxAge: ms('4h'),
           sameSite: 'strict',
           secure: !!process.env.ON_VERCEL,
-          path: '/api/user/refresh_token',
+          path: `/api/${user.role}/refresh_token`,
         })
         .send({
           success: true,
-          user: { email: user.email, username: user.username },
+          user: {
+            email: user.email,
+            username: user.username,
+            displayName: user.displayName,
+            photoUrl: user.photoUrl,
+            role: user.role,
+          },
         });
     } catch (error) {
       if (error.message === 'custom/username-not-found')
         return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found
       if (error.message === 'custom/invalid-role')
         return res.send({ success: false, message: '帳號或密碼錯誤' }); // invalid role
-      if (error.message === 'custom/oauth-provider')
-        return res.send({ success: false, message: '帳號或密碼錯誤' }); // oauth provider
       if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
         if (message === 'EMAIL_NOT_FOUND')
@@ -130,7 +150,7 @@ router.post(
   },
 );
 
-// signout
+/* signout */
 router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
   const sendClearTokens = (_res) => {
     _res
@@ -142,7 +162,7 @@ router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
         sameSite: 'strict',
         path: '/api/user/refresh_token',
       })
-      .send({ success: true });
+      .send({ success: true, message: '已登出' });
   };
   // check cookie
   const errs = validationResult(req);
@@ -153,13 +173,13 @@ router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
     const secret = process.env.ACCESS_TOKEN_SECRET;
     const { uid, role } = await verify(credential, secret);
     // check role
-    if (role !== 'user') throw new Error('');
-    // get refresh token version
-    const user = (await db.ref(`/users/${uid}`).once('value')).val();
+    if (role !== 'user') return sendClearTokens(res);
+    // check user
+    const user = (await db.ref(`/users/details/${uid}`).once('value')).val();
     if (!user) return sendClearTokens(res);
     // update refresh token version
-    const { tokenVersion } = user;
-    await db.ref(`/users/${uid}`).update({ tokenVersion: tokenVersion + 1 });
+    user.tokenVersion += 1;
+    await db.ref(`/users/details/${uid}`).update(user);
     // end
     return sendClearTokens(res);
   } catch (error) {
@@ -167,7 +187,7 @@ router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
   }
 });
 
-// refresh token
+/* refresh token */
 router.post(
   '/refresh_token',
   cookie('refreshToken').isJWT(),
@@ -183,7 +203,7 @@ router.post(
       // check role
       if (role !== 'user') throw new Error('custom/invalid-role');
       // check user
-      const user = (await db.ref(`/users/${uid}`).once('value')).val();
+      const user = (await db.ref(`/users/details/${uid}`).once('value')).val();
       if (!user) throw new Error('custom/account-has-been-revoked');
       // check refresh token version
       if (user.tokenVersion !== tokenVersion) {
@@ -191,7 +211,7 @@ router.post(
       }
       // update refresh token version
       user.tokenVersion += 1;
-      await db.ref(`/users/${uid}`).update(user);
+      await db.ref(`/users/details/${uid}`).update(user);
       // generate token
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
@@ -209,11 +229,17 @@ router.post(
           maxAge: ms('4h'),
           sameSite: 'strict',
           secure: !!process.env.ON_VERCEL,
-          path: '/api/user/refresh_token',
+          path: `/api/${user.role}/refresh_token`,
         })
         .send({
           success: true,
-          user: { email: user.email, username: user.username },
+          user: {
+            email: user.email,
+            username: user.username,
+            displayName: user.displayName,
+            photoUrl: user.photoUrl,
+            role: user.role,
+          },
         });
     } catch (error) {
       if (error.message === 'custom/invalid-role')
@@ -235,13 +261,14 @@ router.post(
   },
 );
 
+/* send password reset mail */
 router.post('/send_password', body('email').isEmail(), async (req, res) => {
   // check body
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
   const { email } = req.body;
   try {
-    // send reset password mail
+    // send password reset mail
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
     const headers = { 'X-Firebase-Locale': 'zh_tw' };
     const payload = { requestType: 'PASSWORD_RESET', email };

@@ -10,7 +10,7 @@ import {
 
 const router = express.Router();
 
-// upload images
+/* upload images */
 router.post(
   '/',
   upload.array('images', 5),

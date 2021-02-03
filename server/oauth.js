@@ -3,15 +3,18 @@ import axios from 'axios';
 import ms from 'ms';
 import { header, query, validationResult } from 'express-validator';
 import { stringify } from 'qs';
-import { db } from '../../connection/firebase-admin';
+import { db } from './connection/firebase-admin';
 import {
   generateAccessToken,
   generateRefreshToken,
-} from '../../utils/generateToken';
+} from './utils/generateToken';
 
-const router = express.Router();
+const app = express();
 
-router.get(
+app.disable('x-powered-by');
+
+/* redirect */
+app.get(
   '/',
   header('referer').notEmpty(),
   query('provider').notEmpty(),
@@ -19,26 +22,26 @@ router.get(
     // check header and query
     const errs = validationResult(req);
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
-    const { referer } = req.headers;
-    const { provider } = req.query;
-    let url = '/';
-    // google oauth action
+    const [{ referer }, { provider }] = [req.headers, req.query];
+    // redirect url
+    let redirectUrl = '/';
+    // google oauth
     if (provider === 'google') {
-      const queryString = stringify({
+      redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?${stringify({
         scope: 'email profile',
         response_type: 'code',
         state: referer,
-        redirect_uri: `${process.env.BASE_URL}/api/oauth/google`,
+        redirect_uri: `${process.env.BASE_URL}/oauth/google`,
         client_id: process.env.GCP_CLIENT_ID,
-      });
-      url = `https://accounts.google.com/o/oauth2/v2/auth?${queryString}`;
+      })}`;
     }
     // end
-    return res.redirect(url);
+    return res.redirect(redirectUrl);
   },
 );
 
-router.get(
+/* google oauth */
+app.get(
   '/google',
   query('code').notEmpty(),
   query('state').notEmpty(),
@@ -47,6 +50,7 @@ router.get(
     const errs = validationResult(req);
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
     const { code, state } = req.query;
+    // request data
     try {
       // exchange authorization code for access token
       const {
@@ -54,16 +58,17 @@ router.get(
       } = await axios.post(
         'https://oauth2.googleapis.com/token',
         stringify({
+          code,
           client_id: process.env.GCP_CLIENT_ID,
           client_secret: process.env.GCP_CLIENT_SECRET,
-          code,
+          redirect_uri: `${process.env.BASE_URL}/oauth/google`,
           grant_type: 'authorization_code',
-          redirect_uri: `${process.env.BASE_URL}/api/oauth/google`,
         }),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
       );
       // sign in with oauth credential
       const {
-        data: { email, localId, displayName, isNewUser },
+        data: { localId, photoUrl, email, displayName, isNewUser },
       } = await axios.post(
         `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${process.env.FIREBASE_ADMIN_APIKEY}`,
         {
@@ -74,34 +79,42 @@ router.get(
         },
       );
       const uid = localId;
+      let user = {};
       // save user
-      let user = '';
       if (isNewUser) {
         user = {
-          username: displayName,
+          username: '',
+          displayName,
           email,
+          draws: 3, // number of draws (only user)
           role: 'user',
-          draws: 3, // number of draws (only users)
           tokenVersion: 0,
-          provider: 'google',
+          providers: ['google'],
+          photoUrl,
         };
-        await db.ref(`/users/${uid}`).set(user);
+        await db.ref(`/users/details/${uid}`).set(user);
       }
-      // update user (custom -> google)
+      // update user
       if (!isNewUser) {
-        user = (await db.ref(`/users/${uid}`).once('value')).val();
-        if (user.username !== displayName) {
-          user.username = displayName;
-          user.provider = 'google';
-          user.role = 'user';
-          user.draws = user.draws || 3;
-          await db.ref(`/users/${uid}`).update(user);
+        user = (await db.ref(`/users/details/${uid}`).once('value')).val();
+        if (!user.providers.includes('google')) {
+          user.displayName = displayName;
+          user.photoUrl = photoUrl;
+          user.providers = [...user.providers, 'google'];
+          await db.ref(`/users/details/${uid}`).update(user);
         }
       }
       // generate token
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
+      const queryString = stringify({
+        email: user.email,
+        username: user.username,
+        displayName: user.displayName,
+        photoUrl: user.photoUrl,
+        role: user.role,
+      });
       return res
         .cookie('accessToken', accessToken, {
           httpOnly: true,
@@ -115,17 +128,17 @@ router.get(
           maxAge: ms('4h'),
           sameSite: 'strict',
           secure: !!process.env.ON_VERCEL,
-          path: '/api/user/refresh_token',
+          path: `/api/${user.role}/refresh_token`,
         })
-        .redirect(state);
+        .redirect(`${state}?${queryString}`);
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
-        return res.send({ success: false, message }); // other error
+        return res.status(400).send({ success: false, message }); // other error
       }
       return res.status(500).send({ success: false, message: error.message }); // unknown error
     }
   },
 );
 
-export default router;
+export default app;

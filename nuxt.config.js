@@ -44,7 +44,10 @@ export default {
     port: 9000,
   },
 
-  serverMiddleware: [{ path: '/api', handler: '@/server/index.js' }],
+  serverMiddleware: [
+    { path: '/api', handler: '@/server/index.js' },
+    { path: '/oauth', handler: '@/server/oauth.js' },
+  ],
 
   axios: {
     baseURL: process.env.BASE_URL || 'http://localhost:9000',

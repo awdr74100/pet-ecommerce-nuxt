@@ -6,7 +6,6 @@ import cookieParser from 'cookie-parser';
 import adminRouter from './routes/admin/index';
 import adminUploadRouter from './routes/admin/upload';
 import userRouter from './routes/user/index';
-import oauthRouter from './routes/oauth/index';
 
 const app = express();
 
@@ -25,6 +24,5 @@ app.use(cookieParser());
 app.use('/admin', adminRouter);
 app.use('/admin/upload', adminUploadRouter);
 app.use('/user', userRouter);
-app.use('/oauth', oauthRouter);
 
 export default app;
