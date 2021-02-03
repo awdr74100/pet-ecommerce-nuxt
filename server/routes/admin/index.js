@@ -1,6 +1,5 @@
 import express from 'express';
 import axios from 'axios';
-import ms from 'ms';
 import { verify } from 'jsonwebtoken';
 import { body, cookie, validationResult } from 'express-validator';
 import { db, auth } from '../../connection/firebase-admin';
@@ -9,6 +8,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from '../../utils/generateToken';
+import { sendAccessToken, sendRefreshToken } from '../../utils/sendToken';
 
 const router = express.Router();
 
@@ -104,31 +104,18 @@ router.post(
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
-      return res
-        .cookie('accessToken', accessToken, {
-          httpOnly: true,
-          maxAge: ms('15m'),
-          sameSite: 'strict',
-          secure: !!process.env.ON_VERCEL,
-          path: '/',
-        })
-        .cookie('refreshToken', refreshToken, {
-          httpOnly: true,
-          maxAge: ms('4h'),
-          sameSite: 'strict',
-          secure: !!process.env.ON_VERCEL,
-          path: `/api/${user.role}/refresh_token`,
-        })
-        .send({
-          success: true,
-          user: {
-            email: user.email,
-            username: user.username,
-            displayName: user.displayName,
-            photoUrl: user.photoUrl,
-            role: user.role,
-          },
-        });
+      sendAccessToken(res, accessToken, '/');
+      sendRefreshToken(res, refreshToken, `/api/${user.role}/refresh_token`);
+      return res.send({
+        success: true,
+        user: {
+          email: user.email,
+          username: user.username,
+          displayName: user.displayName,
+          photoUrl: user.photoUrl,
+          role: user.role,
+        },
+      });
     } catch (error) {
       if (error.message === 'custom/username-not-found')
         return res.send({ success: false, message: '帳號或密碼錯誤' }); // username not found
@@ -215,31 +202,18 @@ router.post(
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
-      return res
-        .cookie('accessToken', accessToken, {
-          httpOnly: true,
-          maxAge: ms('15m'),
-          sameSite: 'strict',
-          secure: !!process.env.ON_VERCEL,
-          path: '/',
-        })
-        .cookie('refreshToken', refreshToken, {
-          httpOnly: true,
-          maxAge: ms('4h'),
-          sameSite: 'strict',
-          secure: !!process.env.ON_VERCEL,
-          path: `/api/${user.role}/refresh_token`,
-        })
-        .send({
-          success: true,
-          user: {
-            email: user.email,
-            username: user.username,
-            displayName: user.displayName,
-            photoUrl: user.photoUrl,
-            role: user.role,
-          },
-        });
+      sendAccessToken(res, accessToken, '/');
+      sendRefreshToken(res, refreshToken, `/api/${user.role}/refresh_token`);
+      return res.send({
+        success: true,
+        user: {
+          email: user.email,
+          username: user.username,
+          displayName: user.displayName,
+          photoUrl: user.photoUrl,
+          role: user.role,
+        },
+      });
     } catch (error) {
       if (error.message === 'custom/invalid-role')
         return res.status(403).send({ success: false, message: '權限不足' }); // invalid role

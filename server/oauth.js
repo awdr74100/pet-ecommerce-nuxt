@@ -1,6 +1,5 @@
 import express from 'express';
 import axios from 'axios';
-import ms from 'ms';
 import { header, query, validationResult } from 'express-validator';
 import { stringify } from 'qs';
 import { db } from './connection/firebase-admin';
@@ -8,6 +7,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from './utils/generateToken';
+import { sendAccessToken, sendRefreshToken } from './utils/sendToken';
 
 const app = express();
 
@@ -50,7 +50,6 @@ app.get(
     const errs = validationResult(req);
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
     const { code, state } = req.query;
-    // request data
     try {
       // exchange authorization code for access token
       const {
@@ -115,22 +114,9 @@ app.get(
         photoUrl: user.photoUrl,
         role: user.role,
       });
-      return res
-        .cookie('accessToken', accessToken, {
-          httpOnly: true,
-          maxAge: ms('15m'),
-          sameSite: 'strict',
-          secure: !!process.env.ON_VERCEL,
-          path: '/',
-        })
-        .cookie('refreshToken', refreshToken, {
-          httpOnly: true,
-          maxAge: ms('4h'),
-          sameSite: 'strict',
-          secure: !!process.env.ON_VERCEL,
-          path: `/api/${user.role}/refresh_token`,
-        })
-        .redirect(`${state}?${queryString}`);
+      sendAccessToken(res, accessToken, '/');
+      sendRefreshToken(res, refreshToken, `/api/${user.role}/refresh_token`);
+      return res.redirect(`${state}?${queryString}`);
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
