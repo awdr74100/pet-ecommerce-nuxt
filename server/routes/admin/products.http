@@ -1,0 +1,5 @@
+@BASE_URL = http://localhost:9000
+
+
+### add product
+POST {{BASE_URL}}/api/admin/products HTTP/1.1

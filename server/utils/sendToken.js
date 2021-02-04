@@ -9,6 +9,7 @@ export const sendAccessToken = (res, accessToken, path) => {
     path,
   });
 };
+
 export const sendRefreshToken = (res, refreshToken, path) => {
   return res.cookie('refreshToken', refreshToken, {
     httpOnly: true,

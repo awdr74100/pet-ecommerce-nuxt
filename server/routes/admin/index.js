@@ -157,7 +157,7 @@ router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
   try {
     // verify access token
     const secret = process.env.ACCESS_TOKEN_SECRET;
-    const { uid, role } = await verify(credential, secret);
+    const { uid, role } = verify(credential, secret);
     // check role
     if (role !== 'admin') return sendClearTokens(res);
     // check user
@@ -180,12 +180,14 @@ router.post(
   async (req, res) => {
     // check cookie
     const errs = validationResult(req);
-    if (!errs.isEmpty()) return res.status(401).send({ success: false }); // invalid value
+    if (!errs.isEmpty()) {
+      return res.status(401).send({ success: false, message: '未攜帶令牌' }); // invalid value
+    }
     const { refreshToken: credential } = req.cookies;
     try {
       // verify refresh token
       const secret = process.env.REFRESH_TOKEN_SECRET;
-      const { uid, role, tokenVersion } = await verify(credential, secret);
+      const { uid, role, tokenVersion } = verify(credential, secret);
       // check role
       if (role !== 'admin') throw new Error('custom/invalid-role');
       // check user
@@ -221,14 +223,18 @@ router.post(
         return res.status(403).send({ success: false, message: '帳號已註銷' }); // account has been revoked
       if (error.message === 'custom/token-has-been-revoked')
         return res.status(403).send({ success: false, message: '令牌已註銷' }); // token has been revoked
-      if (error.message === 'custom/jwt-must-be-provided')
+      if (error.message === 'jwt must be provided')
         return res.status(401).send({ success: false, message: '未攜帶令牌' }); // jwt must be provided
       if (error.message === 'invalid token')
         return res.status(401).send({ success: false, message: '無效令牌' }); // invalid token
-      if (error.message === 'jwt expired')
-        return res.status(403).send({ success: false, message: '令牌已過期' }); // jwt expired
+      if (error.message === 'jwt malformed')
+        return res.status(401).send({ success: false, message: '格式錯誤' }); // jwt malformed
+      if (error.message === 'jwt signature is required')
+        return res.status(401).send({ success: false, message: '需要簽名' }); // jwt signature is required
       if (error.message === 'invalid signature')
-        return res.status(403).send({ success: false, message: '無效簽名' }); // invalid signature
+        return res.status(401).send({ success: false, message: '無效簽名' }); // invalid signature
+      if (error.message === 'jwt expired')
+        return res.status(401).send({ success: false, message: '令牌已過期' }); // jwt expired
       return res.status(500).send({ success: false, message: error.message }); // unknown error
     }
   },
