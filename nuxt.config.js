@@ -1,6 +1,6 @@
 export default {
   head: {
-    title: 'pet-ecommerce-nuxt',
+    title: 'furbabyshop',
     htmlAttrs: {
       lang: 'en',
     },

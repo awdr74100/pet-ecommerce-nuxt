@@ -1,4 +1,4 @@
-# pet-ecommerce-nuxt
+# furbabyshop
 
 ## Build Setup
 
