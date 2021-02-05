@@ -20,7 +20,7 @@ router.post(
     // check empty files
     const errs = !req.files || !req.files.length;
     if (errs) return res.send({ success: false, message: '禁止欄位為空' });
-    // save url
+    // save urls
     const imgUrls = [];
     // generate unique filename
     const generateFilename = () => {
@@ -41,7 +41,7 @@ router.post(
       };
     };
     try {
-      // parallel request
+      // save files
       await Promise.all(
         req.files.map((file) => {
           const filename = generateFilename();
@@ -54,6 +54,7 @@ router.post(
           return bucket.file(filename).save(file.buffer, options);
         }),
       );
+      // end
       return res.send({ success: true, imgUrls });
     } catch (error) {
       return res.status(500).send({ success: false, message: error.message }); // unknown error
