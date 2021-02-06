@@ -23,10 +23,11 @@ Content-Type: application/json
 GET {{BASE_URL}}/api/admin/products HTTP/1.1
 
 ### edit product
-PATCH {{BASE_URL}}/api/admin/products/-MSnFbn33xVTUQGMOo1o HTTP/1.1
+PATCH {{BASE_URL}}/api/admin/products/-MSsnQEiUvzu7pkjZs1T HTTP/1.1
 Content-Type: application/json
 
 {
-  "title": "狗飼料",
-  "sales": 6
+  "title": "兔子飼料",
+  "sales": 10,
+  "img_urls": ["1", "2"]
 }

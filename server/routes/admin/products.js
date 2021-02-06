@@ -73,18 +73,23 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
   const { id } = req.params;
-  const updateProduct = req.body;
+  const editProduct = req.body;
   try {
     // check product
     const product = (await db.ref(`/products/${id}`).once('value')).val();
     if (!product) throw new Error('custom/product-not-found');
-    // check body
-    const valid = Object.keys(updateProduct).every((key) => {
-      return product[key] && typeof product[key] === typeof updateProduct[key];
+    // check payload
+    const valid = Object.keys(editProduct).every((key) => {
+      return (
+        product[key] &&
+        (typeof product[key] === 'object'
+          ? Array.isArray(product[key]) === Array.isArray(editProduct[key])
+          : typeof product[key] === typeof editProduct[key])
+      );
     });
     if (!valid) throw new Error('custom/invalid-property');
     // end
-    await db.ref(`/products/${id}`).update(updateProduct);
+    await db.ref(`/products/${id}`).update(editProduct);
     return res.send({ success: true, message: '已修改產品' });
   } catch (error) {
     if (error.message === 'custom/product-not-found')
