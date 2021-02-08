@@ -29,5 +29,5 @@ Content-Type: application/json
 {
   "title": "兔子飼料",
   "sales": 10,
-  "img_urls": ["1", "2"]
+  "img_urls": ["1", "3"]
 }

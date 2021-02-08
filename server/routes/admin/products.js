@@ -82,9 +82,8 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
     const valid = Object.keys(editProduct).every((key) => {
       return (
         product[key] &&
-        (typeof product[key] === 'object'
-          ? Array.isArray(product[key]) === Array.isArray(editProduct[key])
-          : typeof product[key] === typeof editProduct[key])
+        typeof product[key] === typeof editProduct[key] &&
+        Array.isArray(product[key]) === Array.isArray(editProduct[key])
       );
     });
     if (!valid) throw new Error('custom/invalid-property');
