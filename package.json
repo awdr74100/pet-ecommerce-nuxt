@@ -12,7 +12,7 @@
     "lint:style": "cross-env NODE_ENV=production stylelint **/*.{vue,css,scss} --ignore-path .gitignore"
   },
   "dependencies": {
-    "@nuxtjs/axios": "^5.13.0",
+    "@nuxtjs/axios": "^5.13.1",
     "axios": "^0.21.1",
     "body-parser": "^1.19.0",
     "cookie-parser": "^1.4.5",
@@ -35,7 +35,7 @@
     "@nuxtjs/eslint-module": "^3.0.2",
     "@nuxtjs/stylelint-module": "^4.0.0",
     "@nuxtjs/tailwindcss": "^3.4.2",
-    "@tailwindcss/postcss7-compat": "^2.0.2",
+    "@tailwindcss/postcss7-compat": "^2.0.3",
     "autoprefixer": "^9.8.6",
     "babel-eslint": "^10.1.0",
     "cross-env": "^7.0.3",
@@ -54,6 +54,6 @@
     "stylelint-config-prettier": "^8.0.2",
     "stylelint-config-standard": "^20.0.0",
     "stylelint-prettier": "^1.1.2",
-    "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.0.2"
+    "tailwindcss": "npm:@tailwindcss/postcss7-compat@^2.0.3"
   }
 }
