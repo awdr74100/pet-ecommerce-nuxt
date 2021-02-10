@@ -1,8 +1,8 @@
-import epxress from 'express';
+import express from 'express';
 import { body, param, validationResult } from 'express-validator';
 import { db } from '../../connection/firebase-admin';
 
-const router = epxress.Router();
+const router = express.Router();
 
 /* add product */
 router.post(
@@ -54,14 +54,11 @@ router.get('/', async (req, res) => {
     // get products
     const products = (await db.ref('/products').once('value')).val() || {};
     // convert from object to array
-    const productsToArray = Object.keys(products).map((pId) => {
-      return {
-        id: pId,
-        ...products[pId],
-      };
+    const productsConvert = Object.keys(products).map((id) => {
+      return { id, ...products[id] };
     });
     // end
-    return res.send({ success: true, products: productsToArray });
+    return res.send({ success: true, products: productsConvert });
   } catch (error) {
     return res.status(500).send({ success: false, message: error.message }); // unknown error
   }
@@ -73,20 +70,23 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
   const { id } = req.params;
-  const editProduct = req.body;
+  const updateProduct = req.body;
   try {
     // check product
     const product = (await db.ref(`/products/${id}`).once('value')).val();
     if (!product) throw new Error('custom/product-not-found');
     // check payload
-    const valid = Object.keys(editProduct).every((key) => {
-      if (!product[key]) return false;
-      if (typeof product[key] !== typeof editProduct[key]) return false;
-      return Array.isArray(product[key]) === Array.isArray(editProduct[key]);
+    const valid = Object.keys(updateProduct).every((key) => {
+      return (
+        product[key] &&
+        typeof product[key] === typeof updateProduct[key] &&
+        Array.isArray(product[key]) === Array.isArray(updateProduct[key])
+      );
     });
     if (!valid) throw new Error('custom/invalid-property');
+    // update product
+    await db.ref(`/products/${id}`).update(updateProduct);
     // end
-    await db.ref(`/products/${id}`).update(editProduct);
     return res.send({ success: true, message: '已修改產品' });
   } catch (error) {
     if (error.message === 'custom/product-not-found')
@@ -96,5 +96,20 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
     return res.status(500).send({ success: false, message: error.message }); // unknown error
   }
 });
+
+/* edit product is_enabled >> batch */
+router.patch(
+  '/:ids/is_enabled',
+  param('ids').notEmpty().isString(),
+  body('is_enabled').notEmpty().isBoolean().toBoolean(),
+  async (req, res) => {
+    // check param and body
+    const errs = validationResult(req);
+    if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
+    const ids = req.params.ids.split(',').map((id) => id.trim());
+    const isEnabled = req.body.is_enabled;
+    // check ids length
+  },
+);
 
 export default router;
