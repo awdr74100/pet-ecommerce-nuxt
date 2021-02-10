@@ -80,11 +80,9 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
     if (!product) throw new Error('custom/product-not-found');
     // check payload
     const valid = Object.keys(editProduct).every((key) => {
-      return (
-        product[key] &&
-        typeof product[key] === typeof editProduct[key] &&
-        Array.isArray(product[key]) === Array.isArray(editProduct[key])
-      );
+      if (!product[key]) return false;
+      if (typeof product[key] !== typeof editProduct[key]) return false;
+      return Array.isArray(product[key]) === Array.isArray(editProduct[key]);
     });
     if (!valid) throw new Error('custom/invalid-property');
     // end
