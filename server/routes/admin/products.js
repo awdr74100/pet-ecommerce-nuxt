@@ -4,7 +4,7 @@ import { db } from '../../connection/firebase-admin';
 
 const router = express.Router();
 
-/* add product */
+/* Add Product */
 router.post(
   '/',
   body('title').notEmpty().isString(),
@@ -41,19 +41,19 @@ router.post(
       // add product
       await db.ref('/products').push(product);
       // end
-      return res.send({ success: true, message: '已新增產品' });
+      return res.send({ success: true, message: '已新增商品' });
     } catch (error) {
       return res.status(500).send({ success: false, message: error.message }); // unknown error
     }
   },
 );
 
-/* get products */
+/* Get Products */
 router.get('/', async (req, res) => {
   try {
     // get products
     const products = (await db.ref('/products').once('value')).val() || {};
-    // convert from object to array
+    // convert object to array
     const productsConvert = Object.keys(products).map((id) => {
       return { id, ...products[id] };
     });
@@ -64,7 +64,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-/* edit product */
+/* Edit Product */
 router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
   // check param
   const errs = validationResult(req);
@@ -87,7 +87,7 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
     // update product
     await db.ref(`/products/${id}`).update(updateProduct);
     // end
-    return res.send({ success: true, message: '已修改產品' });
+    return res.send({ success: true, message: '已修改商品' });
   } catch (error) {
     if (error.message === 'custom/product-not-found')
       return res.send({ success: false, message: '未找到商品' }); // product-not-found
@@ -97,19 +97,71 @@ router.patch('/:id', param('id').notEmpty().isString(), async (req, res) => {
   }
 });
 
-/* edit product is_enabled >> batch */
+/* Change Products Enabled Status */
 router.patch(
   '/:ids/is_enabled',
   param('ids').notEmpty().isString(),
-  body('is_enabled').notEmpty().isBoolean().toBoolean(),
+  body('status').notEmpty().isBoolean().toBoolean(),
   async (req, res) => {
     // check param and body
     const errs = validationResult(req);
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
-    const ids = req.params.ids.split(',').map((id) => id.trim());
-    const isEnabled = req.body.is_enabled;
-    // check ids length
+    const [{ ids }, { status }] = [req.params, req.body];
+    // convert string to array
+    const idsConvert = ids.split(',').map((id) => id.trim());
+    try {
+      // check ids exists
+      const products = (await db.ref('/products').once('value')).val() || {};
+      const exists = idsConvert.every((id) => products[id]);
+      if (!exists) throw new Error('custom/product-not-found');
+      // check ids length
+      if (idsConvert.length >= 20) throw new Error('custom/over-length-limit');
+      // change products enabled status
+      const updateProducts = idsConvert.reduce((acc, id) => {
+        return { ...acc, [`${id}/is_enabled`]: status };
+      }, {});
+      await db.ref('/products').update(updateProducts);
+      // end
+      return res.send({ success: true, message: '已修改商品狀態' });
+    } catch (error) {
+      if (error.message === 'custom/product-not-found')
+        return res.send({ success: false, message: '找不到部分商品' });
+      if (error.message === 'custom/over-length-limit')
+        return res.send({ success: false, message: '超過批量處理上限' });
+      return res.status(500).send({ success: false, message: error.message }); // unknown error
+    }
   },
 );
+
+/* Delete Products */
+router.delete('/:ids', param('ids').notEmpty().isString(), async (req, res) => {
+  // check param
+  const errs = validationResult(req);
+  if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
+  const { ids } = req.params;
+  // convert string to array
+  const idsConvert = ids.split(',').map((id) => id.trim());
+  try {
+    // check ids exists
+    const products = (await db.ref('/products').once('value')).val() || {};
+    const exists = idsConvert.every((id) => products[id]);
+    if (!exists) throw new Error('custom/product-not-found');
+    // check ids length
+    if (idsConvert.length >= 20) throw new Error('custom/over-length-limit');
+    // delete products
+    const updateProducts = idsConvert.reduce((acc, id) => {
+      return { ...acc, [`${id}`]: null };
+    }, {});
+    await db.ref('/products').update(updateProducts);
+    // end
+    return res.send({ success: true, message: '已刪除商品' });
+  } catch (error) {
+    if (error.message === 'custom/product-not-found')
+      return res.send({ success: false, message: '找不到部分商品' });
+    if (error.message === 'custom/over-length-limit')
+      return res.send({ success: false, message: '超過批量處理上限' });
+    return res.status(500).send({ success: false, message: error.message }); // unknown error
+  }
+});
 
 export default router;
