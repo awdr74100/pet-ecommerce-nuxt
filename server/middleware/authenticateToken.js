@@ -18,8 +18,7 @@ export default (req, res, next) => {
   if (pass) return next();
   const { accessToken } = req.cookies;
   try {
-    const secret = process.env.ACCESS_TOKEN_SECRET;
-    const decoded = verify(accessToken, secret);
+    const decoded = verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
     const role = req.originalUrl.split('/')[2];
     if (role !== decoded.role) throw new Error('custom/invalid-role');
     req.user = decoded;

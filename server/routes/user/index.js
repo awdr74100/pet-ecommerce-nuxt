@@ -3,16 +3,19 @@ import axios from 'axios';
 import { verify } from 'jsonwebtoken';
 import { body, cookie, validationResult } from 'express-validator';
 import { db, auth } from '../../connection/firebase-admin';
-import generatePhotoUrl from '../../utils/generatePhotoUrl';
 import {
   generateAccessToken,
   generateRefreshToken,
 } from '../../utils/generateToken';
-import { sendAccessToken, sendRefreshToken } from '../../utils/sendToken';
+import {
+  sendAccessToken,
+  sendRefreshToken,
+  sendClearTokens,
+} from '../../utils/sendToken';
 
 const router = express.Router();
 
-/* signup */
+/* Sign Up */
 router.post(
   '/signup',
   body('username').isString().isAlphanumeric().isLength({ min: 6, max: 14 }),
@@ -30,7 +33,8 @@ router.post(
       ).exists();
       if (exist) throw new Error('custom/username-already-exist');
       // generate photo url
-      const photoUrl = generatePhotoUrl(96, 96, username, 48, 'fff', '282828');
+      const prefix = username.slice(0, 1).toLocaleUpperCase();
+      const photoUrl = `https://fakeimg.pl/96x96/282828/fff/?text=${prefix}&font_size=48&font=noto`;
       // create user
       const userInfo = {
         displayName: username,
@@ -73,7 +77,7 @@ router.post(
   },
 );
 
-/* signin */
+/* Sign In */
 router.post(
   '/signin',
   body('usernameOrEmail').notEmpty().isString(),
@@ -105,8 +109,8 @@ router.post(
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
-      sendAccessToken(res, accessToken, '/');
-      sendRefreshToken(res, refreshToken, `/api/${user.role}/refresh_token`);
+      sendAccessToken(res, accessToken);
+      sendRefreshToken(res, refreshToken, user.role);
       return res.send({
         success: true,
         user: {
@@ -137,44 +141,36 @@ router.post(
   },
 );
 
-/* signout */
+/* Sign Out */
 router.post('/signout', cookie('accessToken').isJWT(), async (req, res) => {
-  const sendClearTokens = (_res) => {
-    _res
-      .clearCookie('accessToken', {
-        sameSite: 'strict',
-        path: '/',
-      })
-      .clearCookie('refreshToken', {
-        sameSite: 'strict',
-        path: '/api/user/refresh_token',
-      })
-      .send({ success: true, message: '已登出' });
-  };
   // check cookie
   const errs = validationResult(req);
-  if (!errs.isEmpty()) return sendClearTokens(res);
+  if (!errs.isEmpty()) {
+    sendClearTokens(res, 'user');
+    return res.send({ success: true, message: '已登出' });
+  }
   const { accessToken: credential } = req.cookies;
   try {
     // verify access token
-    const secret = process.env.ACCESS_TOKEN_SECRET;
-    const { uid, role } = verify(credential, secret);
+    const { uid, role } = verify(credential, process.env.ACCESS_TOKEN_SECRET);
     // check role
-    if (role !== 'user') return sendClearTokens(res);
+    if (role !== 'user') return new Error('custom/invalid');
     // check user
     const user = (await db.ref(`/users/details/${uid}`).once('value')).val();
-    if (!user) return sendClearTokens(res);
-    // update refresh token version
+    if (!user) throw new Error('custom/invalid');
+    // update refresh token version (revoke token)
     user.tokenVersion += 1;
     await db.ref(`/users/details/${uid}`).update(user);
     // end
-    return sendClearTokens(res);
+    sendClearTokens(res, 'user');
+    return res.send({ success: true, message: '已登出' });
   } catch (error) {
-    return sendClearTokens(res);
+    sendClearTokens(res, 'user');
+    return res.send({ success: true, message: '已登出' });
   }
 });
 
-/* refresh token */
+/* Refresh Token */
 router.post(
   '/refresh_token',
   cookie('refreshToken').isJWT(),
@@ -187,8 +183,10 @@ router.post(
     const { refreshToken: credential } = req.cookies;
     try {
       // verify refresh token
-      const secret = process.env.REFRESH_TOKEN_SECRET;
-      const { uid, role, tokenVersion } = verify(credential, secret);
+      const { uid, role, tokenVersion } = verify(
+        credential,
+        process.env.REFRESH_TOKEN_SECRET,
+      );
       // check role
       if (role !== 'user') throw new Error('custom/invalid-role');
       // check user
@@ -198,15 +196,15 @@ router.post(
       if (user.tokenVersion !== tokenVersion) {
         throw new Error('custom/token-has-been-revoked');
       }
-      // update refresh token version
+      // update refresh token version (revoke token)
       user.tokenVersion += 1;
       await db.ref(`/users/details/${uid}`).update(user);
       // generate token
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
-      sendAccessToken(res, accessToken, '/');
-      sendRefreshToken(res, refreshToken, `/api/${user.role}/refresh_token`);
+      sendAccessToken(res, accessToken);
+      sendRefreshToken(res, refreshToken, user.role);
       return res.send({
         success: true,
         user: {
@@ -241,14 +239,14 @@ router.post(
   },
 );
 
-/* send password reset mail */
+/* Send Password Reset Email */
 router.post('/send_password', body('email').isEmail(), async (req, res) => {
   // check body
   const errs = validationResult(req);
   if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
   const { email } = req.body;
   try {
-    // send password reset mail
+    // send password reset email
     const url = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${process.env.FIREBASE_ADMIN_APIKEY}`;
     const headers = { 'X-Firebase-Locale': 'zh_tw' };
     const payload = { requestType: 'PASSWORD_RESET', email };

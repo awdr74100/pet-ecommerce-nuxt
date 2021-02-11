@@ -13,7 +13,7 @@ const app = express();
 
 app.disable('x-powered-by');
 
-/* redirect */
+/* Redirect OAuth Server */
 app.get(
   '/',
   header('referer').notEmpty(),
@@ -40,7 +40,7 @@ app.get(
   },
 );
 
-/* google oauth */
+/* Google OAuth */
 app.get(
   '/google',
   query('code').notEmpty(),
@@ -114,8 +114,8 @@ app.get(
         photoUrl: user.photoUrl,
         role: user.role,
       });
-      sendAccessToken(res, accessToken, '/');
-      sendRefreshToken(res, refreshToken, `/api/${user.role}/refresh_token`);
+      sendAccessToken(res, accessToken);
+      sendRefreshToken(res, refreshToken, user.role);
       return res.redirect(`${state}?${queryString}`);
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {
