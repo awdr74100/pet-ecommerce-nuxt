@@ -9,6 +9,7 @@ import authenticateToken from './middleware/authenticateToken';
 // import custom router
 import adminRouter from './routes/admin/index';
 import adminProductsRouter from './routes/admin/products';
+import adminCouponsRouter from './routes/admin/coupons';
 import adminUploadRouter from './routes/admin/upload';
 import userRouter from './routes/user/index';
 
@@ -32,6 +33,7 @@ app.use(authenticateToken);
 // set custom router
 app.use('/admin', adminRouter);
 app.use('/admin/products', adminProductsRouter);
+app.use('/admin/coupons', adminCouponsRouter);
 app.use('/admin/upload', adminUploadRouter);
 app.use('/user', userRouter);
 
