@@ -23,20 +23,20 @@ app.get(
     const errs = validationResult(req);
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
     const [{ referer }, { provider }] = [req.headers, req.query];
-    // redirect url
-    let redirectUrl = '/';
     // google oauth
     if (provider === 'google') {
-      redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?${stringify({
-        scope: 'email profile',
-        response_type: 'code',
-        state: referer,
-        redirect_uri: `${process.env.BASE_URL}/oauth/google`,
-        client_id: process.env.GCP_CLIENT_ID,
-      })}`;
+      return res.redirect(
+        `https://accounts.google.com/o/oauth2/v2/auth?${stringify({
+          scope: 'email profile',
+          response_type: 'code',
+          state: referer,
+          redirect_uri: `${process.env.BASE_URL}/oauth/google`,
+          client_id: process.env.GCP_CLIENT_ID,
+        })}`,
+      );
     }
-    // end
-    return res.redirect(redirectUrl);
+    // redirect referer
+    return res.redirect(referer);
   },
 );
 
@@ -67,7 +67,7 @@ app.get(
       );
       // sign in with oauth credential
       const {
-        data: { localId, photoUrl, email, displayName, isNewUser },
+        data: { localId: uid, photoUrl, email, displayName, isNewUser },
       } = await axios.post(
         `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${process.env.FIREBASE_ADMIN_APIKEY}`,
         {
@@ -77,7 +77,7 @@ app.get(
           returnIdpCredential: false,
         },
       );
-      const uid = localId;
+      // set user
       let user = {};
       // save user
       if (isNewUser) {
@@ -107,16 +107,17 @@ app.get(
       const accessToken = generateAccessToken({ uid, ...user }, '15m');
       const refreshToken = generateRefreshToken({ uid, ...user }, '4h');
       // end
-      const queryString = stringify({
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        photoUrl: user.photoUrl,
-        role: user.role,
-      });
       sendAccessToken(res, accessToken);
       sendRefreshToken(res, refreshToken, user.role);
-      return res.redirect(`${state}?${queryString}`);
+      return res.redirect(
+        `${state}?${stringify({
+          email: user.email,
+          username: user.username,
+          displayName: user.displayName,
+          photoUrl: user.photoUrl,
+          role: user.role,
+        })}`,
+      );
     } catch (error) {
       if (error.response && error.response.data && error.response.data.error) {
         const { message } = error.response.data.error;
