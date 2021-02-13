@@ -18,7 +18,7 @@ const router = express.Router();
 /* Sign Up */
 router.post(
   '/signup',
-  body('username').isString().isAlphanumeric().isLength({ min: 6, max: 14 }),
+  body('username').isString().isLength({ min: 6, max: 14 }).isAlphanumeric(),
   body('email').isEmail(),
   body('password').isString().isLength({ min: 6, max: 14 }),
   async (req, res) => {
@@ -79,8 +79,8 @@ router.post(
 /* Sign In */
 router.post(
   '/signin',
-  body('usernameOrEmail').notEmpty().isString(),
-  body('password').notEmpty().isString(),
+  body('usernameOrEmail').isString().isLength({ min: 1 }),
+  body('password').isString().isLength({ min: 1 }),
   async (req, res) => {
     // check body
     const errs = validationResult(req);
