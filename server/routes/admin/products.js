@@ -22,7 +22,7 @@ router.post(
     // check body
     const errs = validationResult(req);
     if (!errs.isEmpty()) return res.status(400).send({ errors: errs.array() }); // invalid value
-    // create data
+    // set product
     const product = {
       title: req.body.title,
       category: req.body.category,
@@ -31,10 +31,10 @@ router.post(
       unit: req.body.unit,
       description: req.body.description,
       content: req.body.content,
-      is_enabled: req.body.is_enabled,
       sales: req.body.sales,
       stock: req.body.stock,
       img_urls: req.body.img_urls,
+      is_enabled: req.body.is_enabled,
       created_at: Date.now(),
     };
     try {

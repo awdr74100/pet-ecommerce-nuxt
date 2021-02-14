@@ -35,7 +35,7 @@ router.post(
       // generate photo url
       const prefix = username.slice(0, 1).toLocaleUpperCase();
       const photoUrl = `https://fakeimg.pl/96x96/282828/fff/?text=${prefix}&font_size=48&font=noto`;
-      // create user
+      // set user
       const userInfo = {
         displayName: username,
         email,
