@@ -1,1 +1,25 @@
 @BASE_URL = http://localhost:9000
+
+### Add Coupon
+POST {{BASE_URL}}/api/admin/coupons HTTP/1.1
+Content-Type: application/json
+
+{
+  "title": "周年慶",
+  "code": "ALCRE88046",
+  "percent": 20,
+  "effective_date": {{$timestamp}},
+  "due_date": {{$timestamp}},
+  "is_enabled": false
+}
+
+### Get Coupons
+GET {{BASE_URL}}/api/admin/coupons HTTP/1.1
+
+### Edit Coupon
+PATCH {{BASE_URL}}/api/admin/coupons/-MTVANgXm-yzgcvXe_yq
+Content-Type: application/json
+
+{
+  "percent": 30
+}
